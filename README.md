@@ -147,3 +147,140 @@ Explanation:
 - `firstprivate`: Each thread gets a copy of b initialized with the original value (20).
 - `shared`: c is shared across threads.
 
+### Example 04
+
+#### Sequential
+
+Code:
+
+```c
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
+#include <omp.h>
+int main() {
+    const int DIM = 1000;
+    int i,j,k;
+    double debut, fin, temps;
+    double **a, **b, **cresu, **ctest;
+    a= (double**) malloc(DIM*sizeof(double*));
+    b= (double**) malloc(DIM*sizeof(double*));
+    cresu= (double**) malloc(DIM*sizeof(double*));
+    ctest= (double**) malloc(DIM*sizeof(double*));
+    // initialisations etc...
+    for (i=0; i<DIM; i++)
+    {
+        a[i]=(double*) malloc(DIM*sizeof(double));
+        b[i]=(double*) malloc(DIM*sizeof(double));
+        cresu[i]=(double*) malloc(DIM*sizeof(double));
+        ctest[i]=(double*) malloc(DIM*sizeof(double));
+        for (j = 0; j < DIM; j++)
+        {
+            a[i][j] = (double)(i-j);
+            b[i][j] = (double)(i+j);
+            cresu[i][j] = 0.0;
+            ctest[i][j] = 0.0;
+        }
+    } // Multiplication C = A x B (séquentiel)
+    printf("Multiplication sequentielle:\n");
+    debut= omp_get_wtime();
+    for (i = 0; i < DIM; i++)
+        for (j = 0; j < DIM; j++)
+            for (k = 0; k < DIM; k++)
+                ctest[i][j] += a[i][k] * b[k][j];
+    fin= omp_get_wtime();
+    temps=fin-debut;
+    printf ("Calcul séquentiel %f secondes\n", temps);
+    // Multiplication C = A x B (parallèle)
+    return (0);
+}
+```
+
+Result:
+
+```bash
+tp2 on  main [!?] via C v14.2.1-gcc
+➜ ./a.out
+Multiplication sequentielle:
+Calcul séquentiel 9.219313 secondes
+```
+
+#### Parallel
+
+```c
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
+#include <omp.h>
+
+int main() {
+    const int DIM = 1000;
+    int i, j, k;
+    double debut, fin, temps;
+    double **a, **b, **cresu, **ctest;
+
+    a = (double**) malloc(DIM * sizeof(double*));
+    b = (double**) malloc(DIM * sizeof(double*));
+    cresu = (double**) malloc(DIM * sizeof(double*));
+    ctest = (double**) malloc(DIM * sizeof(double*));
+
+    // Initialisation
+    for (i = 0; i < DIM; i++) {
+        a[i] = (double*) malloc(DIM * sizeof(double));
+        b[i] = (double*) malloc(DIM * sizeof(double));
+        cresu[i] = (double*) malloc(DIM * sizeof(double));
+        ctest[i] = (double*) malloc(DIM * sizeof(double));
+
+        for (j = 0; j < DIM; j++) {
+            a[i][j] = (double)(i - j);
+            b[i][j] = (double)(i + j);
+            cresu[i][j] = 0.0;
+            ctest[i][j] = 0.0;
+        }
+    }
+
+    printf("Multiplication parallèle:\n");
+    debut = omp_get_wtime();
+
+    // Corrected OpenMP parallel region
+    #pragma omp parallel for private(i, j, k) schedule(static) num_threads(4)
+    for (i = 0; i < DIM; i++) {
+        for (j = 0; j < DIM; j++) {
+            for (k = 0; k < DIM; k++) {
+                ctest[i][j] += a[i][k] * b[k][j];
+            }
+        }
+    }
+
+    fin = omp_get_wtime();
+    temps = fin - debut;
+    printf("Calcul parallèle %f secondes\n", temps);
+
+    return 0;
+}
+```
+
+Result:
+
+```bash
+tp2 on  main [!?] via C v14.2.1-gcc
+➜ ./a.out
+Multiplication parallèle:
+Calcul parallèle 2.333815 secondes
+```
+
+La directive:
+
+```c
+#pragma omp parallel for private(i, j, k) schedule(static) num_threads(4)
+```
+
+sert a:
+
+- Paralléliser l'exécution de la boucle for sur 4 threads (num_threads(4)).
+- Répartir statiquement les itérations entre les threads (schedule(static)), c’est-à-dire que les itérations sont divisées également au début.
+- Définir i, j, et k comme privés, donc chaque thread possède ses propres copies de ces variables (private(i, j, k)), évitant ainsi les conflits d'accès.
+
+---
+
+END.
